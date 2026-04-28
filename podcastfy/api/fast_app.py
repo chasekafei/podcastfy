@@ -103,7 +103,17 @@ def generate_podcast_endpoint(data: dict):
         style_presets = base_config.get('style_presets', {})
         preset_instructions = style_presets.get(style_key, '') if style_key else ''
         extra_instructions = data.get('user_instructions', base_config.get('user_instructions', ''))
-        merged_instructions = '\n\n'.join(filter(None, [preset_instructions, extra_instructions]))
+
+        # test_mode: inject a short-output instruction so the LLM generates only 2-3
+        # dialogue exchanges. Useful for rapid iteration without burning tokens/cost.
+        test_instruction = (
+            'IMPORTANT: This is a test run. Generate ONLY 2 to 3 dialogue exchanges '
+            '(Person1 + Person2 pairs). Keep each turn to 1-2 sentences maximum. '
+            'Do NOT generate a full-length podcast.'
+            if data.get('test_mode') else ''
+        )
+
+        merged_instructions = '\n\n'.join(filter(None, [test_instruction, preset_instructions, extra_instructions]))
 
         user_config = {
             'creativity': float(data.get('creativity', base_config.get('creativity', 0.7))),
