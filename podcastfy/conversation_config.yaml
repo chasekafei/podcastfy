@@ -48,7 +48,11 @@ text_to_speech:
     default_voices:
       question: "R"
       answer: "S"
-      model: "en-US-Studio-MultiSpeaker"
+  fishaudio:
+    default_voices:
+      question: "fbe02f8306fc4d3d915e9871722a39d5"
+      answer: "5d2a756ccac542bcbac869e2e55b70ed"
+    model: "s2-pro"
   audio_format: "mp3"
   temp_audio_dir: "data/audio/tmp/"
   ending_message: "See You Next Time!"

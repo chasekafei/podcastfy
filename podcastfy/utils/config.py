@@ -56,6 +56,8 @@ class Config:
 		self.GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 		self.OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 		self.ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+		# Fish Audio: env var is FISH_AUDIO_API_KEY, but TTS lookup pattern expects FISHAUDIO_API_KEY
+		self.FISHAUDIO_API_KEY: str = os.getenv("FISH_AUDIO_API_KEY", "")
 		
 		config_path = get_config_path(config_file)
 		if config_path:

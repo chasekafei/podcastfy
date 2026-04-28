@@ -10,10 +10,13 @@ from fastapi.responses import FileResponse, JSONResponse
 import os
 import shutil
 import yaml
+import logging
 from typing import Dict, Any
 from pathlib import Path
 from ..client import generate_podcast
 import uvicorn
+
+logger = logging.getLogger("podcastfy.api")
 
 # ---------------------------------------------------------------------------
 # Cloudflare R2 (S3-compatible) storage — optional, falls back to local disk
@@ -77,6 +80,7 @@ def generate_podcast_endpoint(data: dict):
     try:
         # API keys are read from environment variables (configured via Railway Variables).
         # They are NOT accepted from the request body to avoid security risks.
+        logger.info("[1/4] Request received — parsing config...")
         # Load base configuration
         base_config = load_base_config()
         
@@ -119,12 +123,14 @@ def generate_podcast_endpoint(data: dict):
         
 
         # Generate podcast
+        logger.info("[2/4] Starting content generation (LLM) — this may take 1-3 minutes...")
         result = generate_podcast(
             urls=data.get('urls', []),
             conversation_config=conversation_config,
             tts_model=tts_model,
             longform=bool(data.get('is_long_form', False)),
         )
+        logger.info("[3/4] Content generation done — processing audio output...")
         # Handle the result
         if isinstance(result, str) and os.path.isfile(result):
             source_path = result
@@ -136,19 +142,26 @@ def generate_podcast_endpoint(data: dict):
         filename = f"podcast_{os.urandom(8).hex()}.mp3"
 
         if _r2_enabled:
-            # Upload to Cloudflare R2 and return public URL
+            # Store under YYYY/MM/DD/ prefix for easy filtering
+            from datetime import datetime, timezone
+            date_prefix = datetime.now(timezone.utc).strftime("%Y/%m/%d")
+            r2_key = f"{date_prefix}/{filename}"
+
+            logger.info("[4/4] Uploading to R2: %s", r2_key)
             _s3_client.upload_file(
                 source_path,
                 _R2_BUCKET_NAME,
-                filename,
+                r2_key,
                 ExtraArgs={"ContentType": "audio/mpeg"},
             )
-            public_url = f"{_R2_PUBLIC_URL.rstrip('/')}/{filename}"
+            public_url = f"{_R2_PUBLIC_URL.rstrip('/')}/{r2_key}"
+            logger.info("Done — audioUrl: %s", public_url)
             return {"audioUrl": public_url}
         else:
             # Fallback: store locally and return relative path
             output_path = os.path.join(TEMP_DIR, filename)
             shutil.copy2(source_path, output_path)
+            logger.info("[4/4] Done — saved locally: %s", filename)
             return {"audioUrl": f"/audio/{filename}"}
 
     except Exception as e:
