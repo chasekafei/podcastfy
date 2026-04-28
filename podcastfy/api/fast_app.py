@@ -93,6 +93,13 @@ def generate_podcast_endpoint(data: dict):
         default_voices = tts_base_config.get('default_voices', {})
         
         # Prepare user configuration
+        # Resolve style preset: merge preset instructions with any extra user_instructions
+        style_key = data.get('style')
+        style_presets = base_config.get('style_presets', {})
+        preset_instructions = style_presets.get(style_key, '') if style_key else ''
+        extra_instructions = data.get('user_instructions', base_config.get('user_instructions', ''))
+        merged_instructions = '\n\n'.join(filter(None, [preset_instructions, extra_instructions]))
+
         user_config = {
             'creativity': float(data.get('creativity', base_config.get('creativity', 0.7))),
             'conversation_style': data.get('conversation_style', base_config.get('conversation_style', [])),
@@ -102,7 +109,7 @@ def generate_podcast_endpoint(data: dict):
             'podcast_name': data.get('name', base_config.get('podcast_name')),
             'podcast_tagline': data.get('tagline', base_config.get('podcast_tagline')),
             'output_language': data.get('output_language', base_config.get('output_language', 'English')),
-            'user_instructions': data.get('user_instructions', base_config.get('user_instructions', '')),
+            'user_instructions': merged_instructions,
             'engagement_techniques': data.get('engagement_techniques', base_config.get('engagement_techniques', [])),
             'text_to_speech': {
                 'default_tts_model': tts_model,
@@ -181,6 +188,13 @@ def healthcheck():
         "status": "healthy",
         "r2_storage": "enabled" if _r2_enabled else "disabled (using local storage fallback)",
     }
+
+@app.get("/styles")
+def list_styles():
+    """Return available style preset keys."""
+    config = load_base_config()
+    presets = config.get('style_presets', {})
+    return {"styles": list(presets.keys())}
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
