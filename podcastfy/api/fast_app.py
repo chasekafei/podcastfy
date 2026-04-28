@@ -5,9 +5,12 @@ This module provides REST endpoints for podcast generation and audio serving,
 with configuration management and temporary file handling.
 """
 
+# Disable LangSmith tracing before any langchain import to suppress APIKeyWarning
+import os
+os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
-import os
 import shutil
 import yaml
 import logging
@@ -16,7 +19,9 @@ from pathlib import Path
 from ..client import generate_podcast
 import uvicorn
 
-logger = logging.getLogger("podcastfy.api")
+# Use uvicorn's logger so output always appears in the terminal regardless of
+# how the Python root logger is configured at startup time.
+logger = logging.getLogger("uvicorn.error")
 
 # ---------------------------------------------------------------------------
 # Cloudflare R2 (S3-compatible) storage — optional, falls back to local disk
@@ -45,7 +50,7 @@ if _r2_enabled:
 
 
 def load_base_config() -> Dict[Any, Any]:
-    config_path = Path(__file__).parent / "podcastfy" / "conversation_config.yaml"
+    config_path = Path(__file__).parent.parent / "conversation_config.yaml"
     try:
         with open(config_path, 'r') as file:
             return yaml.safe_load(file)

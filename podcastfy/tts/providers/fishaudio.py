@@ -6,8 +6,9 @@ Auth: Bearer token via FISH_AUDIO_API_KEY env var
 
 import os
 import requests
-from typing import List, Optional
+from typing import Dict, List, Optional
 from ..base import TTSProvider
+from ...utils.config_conversation import load_conversation_config
 
 _FISH_AUDIO_API_URL = "https://api.fish.audio/v1/tts"
 _DEFAULT_MODEL = "s2-pro"
@@ -17,7 +18,8 @@ class FishAudioTTS(TTSProvider):
     """Fish Audio Text-to-Speech provider.
 
     Supports high-quality Chinese TTS and voice cloning via reference_id.
-    Configure via environment variables or constructor arguments.
+    Each call to generate_audio corresponds to one dialogue turn (one speaker
+    block), which is already the natural granularity used by text_to_speech.py.
     """
 
     PROVIDER_SSML_TAGS: List[str] = ["p", "s"]
@@ -37,6 +39,17 @@ class FishAudioTTS(TTSProvider):
             )
         self.model = model
 
+        # Load per-voice speed settings from conversation_config.yaml
+        try:
+            conv_config = load_conversation_config()
+            fishaudio_cfg = conv_config.get("text_to_speech", {}).get("fishaudio", {})
+            self.voice_speeds: Dict[str, float] = {
+                str(k): float(v)
+                for k, v in fishaudio_cfg.get("voice_speeds", {}).items()
+            }
+        except Exception:
+            self.voice_speeds = {}
+
     def get_supported_tags(self) -> List[str]:
         return self.PROVIDER_SSML_TAGS
 
@@ -49,13 +62,16 @@ class FishAudioTTS(TTSProvider):
     ) -> bytes:
         """Generate audio using Fish Audio API.
 
+        Called once per speaker turn. The caller (text_to_speech.py) already
+        splits the transcript into individual Person1/Person2 turns, so this
+        method simply forwards the text as-is to the Fish Audio API.
+
         Args:
-            text: Text to convert to speech.
-            voice: Fish Audio voice model ID (reference_id). Use the model ID
-                   from fish.audio, e.g. "8ef4a238714b45718ce04243307c57a7".
+            text: Text to convert to speech (one dialogue turn).
+            voice: Fish Audio voice model ID (reference_id).
                    Pass an empty string to use the default system voice.
             model: TTS model name (e.g. "s2-pro", "s1"). Overrides constructor default.
-            voice2: Unused (single-speaker mode only).
+            voice2: Unused (single-speaker provider).
 
         Returns:
             Raw MP3 audio bytes.
@@ -80,6 +96,9 @@ class FishAudioTTS(TTSProvider):
         }
         if voice:
             payload["reference_id"] = voice
+        speed = self.voice_speeds.get(voice, 1.0)
+        if speed != 1.0:
+            payload["speed"] = speed
 
         try:
             response = requests.post(

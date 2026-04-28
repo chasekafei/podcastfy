@@ -50,9 +50,12 @@ text_to_speech:
       answer: "S"
   fishaudio:
     default_voices:
-      question: "fbe02f8306fc4d3d915e9871722a39d5"
-      answer: "5d2a756ccac542bcbac869e2e55b70ed"
+      question: "97b59eed11b9480f8bbc1ac0f1cc36ee"
+      answer: "94e6373ce822426d92a0b3b6a866479b"
     model: "s2-pro"
+    voice_speeds:
+      97b59eed11b9480f8bbc1ac0f1cc36ee: 1.2
+      94e6373ce822426d92a0b3b6a866479b: 1.1
   audio_format: "mp3"
   temp_audio_dir: "data/audio/tmp/"
   ending_message: "See You Next Time!"
