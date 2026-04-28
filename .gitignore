@@ -8,6 +8,13 @@ specs/
 # Exclude aliases file
 alias.sh
 
+# Generated runtime files — audio and transcripts
+data/audio/*.mp3
+data/audio/*.wav
+data/audio/tmp/
+data/transcripts/*.txt
+podcastfy/data/audio/tmp/
+
 local_*.ipynb
 *.ipynb_checkpoints
 

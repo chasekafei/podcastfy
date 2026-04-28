@@ -14,6 +14,19 @@ import re
 from langchain_community.chat_models import ChatLiteLLM
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.llms.llamafile import Llamafile
+
+# ---------------------------------------------------------------------------
+# LLM Aggregator (OpenAI-compatible, e.g. GPTProto) — optional
+# Set LLM_BASE_URL + LLM_API_KEY to route ALL model calls through an aggregator.
+# When unset, each model uses its native SDK (Gemini → Google SDK, etc.).
+# ---------------------------------------------------------------------------
+_LLM_BASE_URL: str | None = os.environ.get("LLM_BASE_URL")   # e.g. https://gptproto.com/v1
+_LLM_API_KEY: str | None = os.environ.get("LLM_API_KEY")     # aggregator API key
+
+# LiteLLM validates OPENAI_API_KEY even when a custom api_base is used.
+# Mirror LLM_API_KEY so the check passes without requiring a real OpenAI key.
+if _LLM_BASE_URL and _LLM_API_KEY and not os.environ.get("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = _LLM_API_KEY
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain import hub
@@ -58,6 +71,16 @@ class LLMBackend:
 
         if is_local:
             self.llm = Llamafile() # replace with ollama
+        elif _LLM_BASE_URL and _LLM_API_KEY:
+            # Route through OpenAI-compatible aggregator (e.g. GPTProto).
+            # LiteLLM requires the "openai/" prefix to use a custom base URL.
+            self.llm = ChatLiteLLM(
+                model=f"openai/{self.model_name}",
+                api_base=_LLM_BASE_URL,
+                api_key=_LLM_API_KEY,
+                temperature=temperature,
+                max_tokens=max_output_tokens,
+            )
         elif (
             "gemini" in self.model_name.lower()
         ):  # keeping original gemini as a special case while we build confidence on LiteLLM

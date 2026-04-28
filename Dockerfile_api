@@ -21,8 +21,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN python3 -m pip install --upgrade pip
 
 # Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
 
 # Install Playwright browsers and OS dependencies (Chromium only to keep image smaller)
 RUN python -m playwright install --with-deps chromium
@@ -43,4 +43,4 @@ RUN echo "Verifying installations:" && \
     echo "Installed packages:" && pip list
 
 # Command to run when container starts
-CMD ["uvicorn", "podcastfy.api.fast_app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn podcastfy.api.fast_app:app --host 0.0.0.0 --port ${PORT:-8000}"]

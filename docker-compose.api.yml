@@ -1,0 +1,26 @@
+# docker-compose.api.yml — 本地启动 API 服务专用
+# 使用方式：
+#   docker compose -f docker-compose.api.yml up --build
+#   docker compose -f docker-compose.api.yml down
+
+version: '3.8'
+
+services:
+  podcastfy-api:
+    build:
+      context: .
+      dockerfile: Dockerfile_api
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    volumes:
+      # 将容器内生成的音频映射到本地，方便直接查看（仅本地调试用）
+      - ./data/audio/tmp:/app/podcastfy/api/temp_audio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
