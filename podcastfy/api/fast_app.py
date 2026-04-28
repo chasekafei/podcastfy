@@ -15,6 +15,31 @@ from pathlib import Path
 from ..client import generate_podcast
 import uvicorn
 
+# ---------------------------------------------------------------------------
+# Cloudflare R2 (S3-compatible) storage — optional, falls back to local disk
+# ---------------------------------------------------------------------------
+_R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL")
+_R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
+_R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
+_R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
+_R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL")
+
+_r2_enabled = all([_R2_ENDPOINT_URL, _R2_ACCESS_KEY_ID, _R2_SECRET_ACCESS_KEY, _R2_BUCKET_NAME, _R2_PUBLIC_URL])
+_s3_client = None
+
+if _r2_enabled:
+    try:
+        import boto3
+        _s3_client = boto3.client(
+            "s3",
+            endpoint_url=_R2_ENDPOINT_URL,
+            aws_access_key_id=_R2_ACCESS_KEY_ID,
+            aws_secret_access_key=_R2_SECRET_ACCESS_KEY,
+        )
+    except Exception as _e:
+        print(f"Warning: Failed to initialize R2 client: {_e}")
+        _r2_enabled = False
+
 
 def load_base_config() -> Dict[Any, Any]:
     config_path = Path(__file__).parent / "podcastfy" / "conversation_config.yaml"
@@ -50,11 +75,8 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 def generate_podcast_endpoint(data: dict):
     """"""
     try:
-        # Set environment variables
-        os.environ['OPENAI_API_KEY'] = data.get('openai_key')
-        os.environ['GEMINI_API_KEY'] = data.get('google_key')
-        os.environ['ELEVENLABS_API_KEY'] = data.get('elevenlabs_key')
-
+        # API keys are read from environment variables (configured via Railway Variables).
+        # They are NOT accepted from the request body to avoid security risks.
         # Load base configuration
         base_config = load_base_config()
         
@@ -105,17 +127,29 @@ def generate_podcast_endpoint(data: dict):
         )
         # Handle the result
         if isinstance(result, str) and os.path.isfile(result):
-            filename = f"podcast_{os.urandom(8).hex()}.mp3"
-            output_path = os.path.join(TEMP_DIR, filename)
-            shutil.copy2(result, output_path)
-            return {"audioUrl": f"/audio/{filename}"}
+            source_path = result
         elif hasattr(result, 'audio_path'):
-            filename = f"podcast_{os.urandom(8).hex()}.mp3"
-            output_path = os.path.join(TEMP_DIR, filename)
-            shutil.copy2(result.audio_path, output_path)
-            return {"audioUrl": f"/audio/{filename}"}
+            source_path = result.audio_path
         else:
             raise HTTPException(status_code=500, detail="Invalid result format")
+
+        filename = f"podcast_{os.urandom(8).hex()}.mp3"
+
+        if _r2_enabled:
+            # Upload to Cloudflare R2 and return public URL
+            _s3_client.upload_file(
+                source_path,
+                _R2_BUCKET_NAME,
+                filename,
+                ExtraArgs={"ContentType": "audio/mpeg"},
+            )
+            public_url = f"{_R2_PUBLIC_URL.rstrip('/')}/{filename}"
+            return {"audioUrl": public_url}
+        else:
+            # Fallback: store locally and return relative path
+            output_path = os.path.join(TEMP_DIR, filename)
+            shutil.copy2(source_path, output_path)
+            return {"audioUrl": f"/audio/{filename}"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -130,7 +164,10 @@ def serve_audio(filename: str):
 
 @app.get("/health")
 def healthcheck():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "r2_storage": "enabled" if _r2_enabled else "disabled (using local storage fallback)",
+    }
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
