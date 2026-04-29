@@ -56,6 +56,11 @@ text_to_speech:
     voice_speeds:
       97b59eed11b9480f8bbc1ac0f1cc36ee: 1.2
       94e6373ce822426d92a0b3b6a866479b: 1.1
+    # Emotion annotation — adds S2-Pro [bracket] cues to each dialogue turn
+    # before audio is generated.  Set to false to disable.
+    emotion_annotation: true
+    # LLM model used for annotation.  Any model reachable via LLM_BASE_URL works.
+    annotation_model: "gemini-3-flash-preview"
   audio_format: "mp3"
   temp_audio_dir: "data/audio/tmp/"
   ending_message: "See You Next Time!"

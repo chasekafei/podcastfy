@@ -92,6 +92,10 @@ class TextToSpeech:
 
         cleaned_text = text
 
+        # Let the provider preprocess the transcript (e.g. Fish Audio S2-Pro adds
+        # [bracket] emotion cues here before the text is split into Q&A segments).
+        cleaned_text = self.provider.preprocess_transcript(cleaned_text)
+
         try:
 
             if (

@@ -39,6 +39,23 @@ class TTSProvider(ABC):
             Set of supported SSML tag names
         """
         return self.COMMON_SSML_TAGS.copy()
+
+    def preprocess_transcript(self, text: str) -> str:
+        """
+        Optional hook for providers to preprocess a transcript before it is split
+        into Q&A segments and sent to generate_audio().
+
+        The default implementation is a no-op. Providers that support inline
+        emotion/style markup (e.g. Fish Audio S2-Pro) can override this method
+        to annotate the transcript in one LLM pass before audio generation.
+
+        Args:
+            text: Raw transcript with <Person1>/<Person2> tags.
+
+        Returns:
+            Processed transcript (may contain provider-specific markup).
+        """
+        return text
     
     def validate_parameters(self, text: str, voice: str, model: str, voice2: str = None) -> None:
         """
